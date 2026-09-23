@@ -1,5 +1,7 @@
 # HANDOFF — DA12345 (Dewi Aditya ERP)
 
+> **🔴 SESI BERIKUTNYA (2026-09-23): owner sudah mengisi berkas harga/BOM → KONSOLIDASI. Baca `HANDOFF_KONSOLIDASI_HARGA_BOM.md` lebih dulu.**
+>
 > **🔴 STATUS (2026-09-23): berkas FOKUS selesai & teruji — sheet BOM_OTOMATIS + kolom `di_berkas_anda` (iteration_224). Log: `memory/PRD.md` paling atas.**
 > Bring-up: `pip install -r requirements.txt` gagal karena pin `litellm`/`emergentintegrations` → pasang sisanya tanpa dua paket itu (sudah terpasang di image).
 >
