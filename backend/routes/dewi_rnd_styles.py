@@ -809,7 +809,7 @@ async def data_completeness(user: dict = Depends(require_auth)):
     from core.bom_gap import load_bom_state  # satu logika dengan berkas FOKUS (core/gap_fokus.py)
     bom_state = await load_bom_state(db)
     bom_keys = {mid: st['keys'] for mid, st in bom_state.items()}
-    bom_acc = {mid for mid, st in bom_state.items() if st['has_acc']}
+    bom_acc_keys = {mid: st['acc_keys'] for mid, st in bom_state.items()}  # aksesoris dinilai per BOM/varian, bukan per model
     tp_styles = set(await db.dewi_rnd_tech_packs.distinct('style_id', {'is_latest': True, 'status': {'$ne': 'deleted'}}))
     rows, summary = [], {k: 0 for k, _ in COMPLETENESS_CHECKS}
     discontinued_n = 0
@@ -818,7 +818,7 @@ async def data_completeness(user: dict = Depends(require_auth)):
         discontinued = not vs and m['id'] in all_variant_models  # punya varian tapi SEMUA nonaktif (sudah tidak dijual)
         flags = {
             'bom': bool(vs) and vs <= bk,
-            'accessories': m['id'] in bom_acc,
+            'accessories': bool(vs) and vs <= bom_acc_keys.get(m['id'], set()),
             'techpack': bool(m.get('rnd_style_id')) and m['rnd_style_id'] in tp_styles,
             'photo': bool(m.get('image_paths')),
             'hpp': float(m.get('hpp') or 0) > 0 and (m.get('hpp_validation') or {}).get('status') != 'belum_tervalidasi',

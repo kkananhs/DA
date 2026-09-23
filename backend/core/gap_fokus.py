@@ -25,7 +25,7 @@ WRAP = Alignment(wrap_text=True, vertical="top")
 BOM_FOKUS_COLS = BOM_COLS + ["yang_perlu_diisi"]
 VARIAN_FOKUS_COLS = gap_sisa.VARIAN_BARU_COLS
 MAT_FOKUS_COLS = MAT_COLS
-RINGKASAN_COLS = ["kode_model", "nama_model", "kategori", "varian_aktif", "varian_tanpa_bom", "aksesoris_di_bom", "status", "isi_di_sheet", "di_berkas_anda"]
+RINGKASAN_COLS = ["kode_model", "nama_model", "kategori", "varian_aktif", "varian_tanpa_bom", "varian_tanpa_aksesoris", "aksesoris_di_bom", "status", "isi_di_sheet", "di_berkas_anda"]
 _SIZE_RE = re.compile(r"\b(?:size|uk|ukuran)\s*[:.]?\s*(xxl|xl|l|m|s|allsize|all size|std|jmb)\b", re.I)
 
 PETUNJUK = [
@@ -46,7 +46,8 @@ PETUNJUK = [
     ("     Baris ber-kode_model = awal kelompok; baris di bawahnya (kode_model kosong) = bahan lain kelompok yang sama. Jangan hapus baris yang sudah benar.", False),
     ("     Kolom 'varian' = warna/ukuran pemakai bahan itu, dipisah koma, pilih dari 'varian_tersedia'. Kosong = semua varian model.", False),
     ("     Model yang belum punya SKU juga sudah punya kelompok kosong di sini — isi bahannya; SKU-nya dibuat dari VARIAN_BARU pada unggahan yang sama.", False),
-    ("     Varian yang belum punya BOM: aksesorisnya sudah disalin (biru) dari BOM varian lain model yang sama — periksa, ubah bila berbeda.", False),
+    ("     Varian yang belum punya BOM, atau BOM-nya belum punya aksesoris: aksesorisnya sudah disalin (biru) dari BOM varian lain model yang sama — periksa, ubah bila berbeda.", False),
+    ("     Kelengkapan dinilai PER VARIAN: model dianggap lengkap hanya bila SEMUA variannya punya BOM ber-aksesoris (kolom varian_tanpa_aksesoris di RINGKASAN).", False),
     ("     Sheet BOM_OTOMATIS — kelompok yang sudah diisi otomatis oleh sistem (varian biru) atau selesai lewat sheet lain (VARIAN_BARU/MATERIAL).", False),
     ("     Tidak ada sel kuning di sana: cukup periksa. Sheet ini IKUT DITERAPKAN saat diunggah balik — biarkan apa adanya, jangan dihapus.", False),
     ("  3. Sheet MATERIAL — bahan yang harganya masih 0 atau isi kemasannya belum diketahui. Isi 'harga_per_satuan_beli' (harga 1 roll / 1 m / 1 pack)", False),
@@ -307,7 +308,7 @@ async def build_fokus_workbook(db, parsed: dict | None, data: bytes | None) -> t
         for g in parsed.get("bom_groups") or []:
             per_model_file.setdefault(g["model_code"], {"perlu_isian": 0, "otomatis": 0, "diterapkan": 0})["diterapkan"] += 1
     # ── SEMUA model yang BOM-nya belum lengkap (logika = papan kelengkapan R&D) & belum ada di berkas ──
-    n_kosong = n_tanpa_sku = n_varian_tanpa_bom = n_tanpa_bom = 0
+    n_kosong = n_tanpa_sku = n_varian_tanpa_bom = n_tanpa_bom = n_varian_tanpa_acc = 0
     for gm in gap_models:
         if gm["discontinued"] or gm["code"] in in_file:
             continue
@@ -320,28 +321,35 @@ async def build_fokus_workbook(db, parsed: dict | None, data: bytes | None) -> t
             n_tanpa_bom += 1
             _blank_group(ws, code, name, "", _variants_label(vs), f"model belum punya BOM sama sekali ({len(vs)} varian) — isi kode_material & qty_per_pcs "
                          "aksesoris (varian kosong = semua varian); kain/potongan dilengkapi di R&D → BOM")
-        elif gm["variants_without_bom"]:  # sebagian varian tanpa BOM → salin aksesoris dari BOM varian saudara (biru — periksa)
-            for v in gm["variants_without_bom"]:
-                n_varian_tanpa_bom += 1
+        elif not gm["has_acc"]:  # tidak satu pun BOM punya aksesoris → satu kelompok untuk semua varian (varian tanpa BOM ikut dibuat saat diterapkan)
+            n_kosong += 1
+            tail = f"; {len(gm['variants_without_bom'])} varian yang belum punya BOM dibuat otomatis saat diunggah" if gm["variants_without_bom"] else ""
+            _blank_group(ws, code, name, "", _variants_label(vs), "belum ada aksesoris di BOM — isi kode_material (lihat REF_AKSESORIS) & qty_per_pcs; "
+                         "varian kosong = semua varian; tambah baris bila perlu" + tail)
+        else:  # sebagian varian tanpa BOM / BOM tanpa aksesoris → salin dari varian saudara yang punya aksesoris (biru — periksa)
+            for v, mode in [(v, "bom") for v in gm["variants_without_bom"]] + [(v, "acc") for v in gm["variants_without_acc"]]:
+                if mode == "bom":
+                    n_varian_tanpa_bom += 1
+                else:
+                    n_varian_tanpa_acc += 1
                 sib = _sibling_bom(gm["boms"], v)
                 acc = [ln for ln in (sib or {}).get("materials") or [] if not _is_kept_line(ln)]
                 vlabel = f"{v.get('color_name') or v.get('color_code') or ''} {v.get('size_code') or ''}".strip()
+                what = "belum punya BOM" if mode == "bom" else "BOM-nya belum punya aksesoris"
                 if not acc:
-                    _blank_group(ws, code, name, vlabel, _variants_label(vs), f"varian {v.get('sku')} belum punya BOM — isi kode_material & qty_per_pcs aksesorisnya")
+                    _blank_group(ws, code, name, vlabel, _variants_label(vs), f"varian {v.get('sku')} {what} — isi kode_material & qty_per_pcs aksesorisnya")
                     continue
                 for k, ln in enumerate(acc):
                     ws.append([code if k == 0 else "", name if k == 0 else "", ln.get("code"), ln.get("name"), ln.get("qty"), ln.get("unit"), "",
                                vlabel if k == 0 else "", _variants_label(vs) if k == 0 else "",
-                               (f"varian {v.get('sku')} belum punya BOM — aksesoris disalin dari BOM varian lain; periksa, ubah bila berbeda, "
-                                "lalu unggah (BOM varian ini dibuat otomatis)") if k == 0 else ""])
+                               (f"varian {v.get('sku')} {what} — aksesoris disalin dari BOM varian lain; periksa, ubah bila berbeda, "
+                                + ("lalu unggah (BOM varian ini dibuat otomatis)" if mode == "bom" else "lalu unggah (aksesoris ditambahkan ke BOM varian ini)")) if k == 0 else ""])
                     _fill(ws, ws.max_row, BOM_FOKUS_COLS, ["kode_material", "qty_per_pcs", "varian"], BLUE)
-        elif not gm["has_acc"]:  # BOM lengkap tapi tanpa aksesoris
-            n_kosong += 1
-            _blank_group(ws, code, name, "", _variants_label(vs), "belum ada aksesoris di BOM — isi kode_material (lihat REF_AKSESORIS) & qty_per_pcs; tambah baris bila perlu")
     stats["bom_model_tanpa_aksesoris"] = n_kosong
     stats["bom_model_tanpa_sku"] = n_tanpa_sku
     stats["bom_model_tanpa_bom"] = n_tanpa_bom
     stats["bom_varian_tanpa_bom"] = n_varian_tanpa_bom
+    stats["bom_varian_tanpa_aksesoris"] = n_varian_tanpa_acc
     stats["model_dihentikan"] = sum(1 for gm in gap_models if gm["discontinued"])
     for sheet in (ws, ws_oto):
         for c in sheet[1]:
@@ -391,20 +399,29 @@ async def build_fokus_workbook(db, parsed: dict | None, data: bytes | None) -> t
     # ── isi RINGKASAN_MODEL (kolom berkas hanya terisi bila berkas klien diunggah) ──
     for gm in gap_models:
         pf = per_model_file.get(gm["code"])
-        berkas = ("—" if not parsed else
-                  (f"{pf['diterapkan']} kelompok langsung diterapkan · {pf['otomatis']} varian ditebak otomatis (BOM_OTOMATIS) · "
-                   f"{pf['perlu_isian']} masih perlu isian Anda (BOM_AKSESORIS)") if pf else "tidak ada di berkas Anda")
+        if not parsed:
+            berkas = "—"
+        elif not pf:
+            berkas = "tidak ada di berkas Anda"
+        elif not gm["variants"]:
+            berkas = (f"{pf['otomatis'] + pf['perlu_isian']} kelompok aksesoris ada di berkas Anda, tetapi model ini belum punya SKU → "
+                      f"isi 'ukuran' di VARIAN_BARU dulu ({pf['perlu_isian']} kelompok juga masih perlu isian di BOM_AKSESORIS)")
+        else:
+            berkas = (f"{pf['diterapkan']} kelompok langsung diterapkan · {pf['otomatis']} varian ditebak otomatis (BOM_OTOMATIS) · "
+                      f"{pf['perlu_isian']} masih perlu isian Anda (BOM_AKSESORIS)")
         ws_ring.append([gm["code"], gm["name"], gm["category"], len(gm["variants"]), len(gm["variants_without_bom"]),
-                        "ya" if gm["has_acc"] else "tidak", gm["status"], gm["sheet"], berkas])
+                        len(gm["variants_without_acc"]) + len(gm["variants_without_bom"]),
+                        "ya" if gm["has_acc"] and not gm["variants_without_acc"] else ("sebagian" if gm["has_acc"] else "tidak"),
+                        gm["status"], gm["sheet"], berkas])
         if gm["discontinued"]:
             for c in ws_ring[ws_ring.max_row]:
                 c.fill = GREY
         elif pf and pf["perlu_isian"] == 0 and (pf["otomatis"] or pf["diterapkan"]):
             ws_ring.cell(row=ws_ring.max_row, column=RINGKASAN_COLS.index("di_berkas_anda") + 1).fill = BLUE
     for row in ws_ring.iter_rows(min_row=2, max_row=ws_ring.max_row):
-        for c in row[6:]:
+        for c in row[7:]:
             c.alignment = WRAP
-    _widths(ws_ring, (12, 22, 12, 12, 16, 16, 52, 52, 70))
+    _widths(ws_ring, (12, 22, 12, 12, 16, 20, 16, 52, 52, 70))
     ws_ring.freeze_panes = "C2"
 
     buf = io.BytesIO()

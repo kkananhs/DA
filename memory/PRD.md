@@ -1,5 +1,11 @@
 # PRD — CV. Dewi Aditya ERP
 
+## SESI 2026-09-23 #2 — Laporan jujur kekosongan BOM + perbaikan logika "aksesoris per varian"
+**Temuan owner:** laporan sebelumnya salah. Verifikasi langsung dari DB (`scripts/laporan_kekosongan_bom.py`): 104 model aktif = 56 lengkap · 6 dihentikan · **42 harus diisi** (20 tanpa SKU · 1 nol BOM (Ona) · 2 Hanny/Hanni · 18 BOM tanpa aksesoris · **1 sebagian: DA-1101 Lyora BURGUNDY — terlewat semua laporan lama** karena `has_acc` dinilai per model).
+Simulasi (DB dipulihkan): unggah DA (3) apa adanya = 0 perubahan; terima semua tebakan biru → masih 40 kurang (13 di antaranya "sebagian varian" yang papan lama tandai ✓).
+**Perbaikan:** `core/bom_gap.py` `acc_keys` per BOM + `variants_without_acc`; papan `completeness` flag `accessories` = semua varian aktif punya BOM ber-aksesoris; FOKUS: kelompok per varian-tanpa-aksesoris (salin biru dari saudara), model tanpa satu pun aksesoris = 1 kelompok semua varian (varian tanpa BOM dibuat saat unggah); RINGKASAN kolom `varian_tanpa_aksesoris`, teks `di_berkas_anda` untuk model tanpa SKU dibetulkan. Test `tests/test_fokus_cakupan_bom.py` disesuaikan (18 cek PASS). Laporan lengkap: `memory/LAPORAN_KEKOSONGAN_BOM_2026-09-23.md`.
+
+
 ## SESI 2026-09-23 — Penutupan berkas FOKUS: sheet BOM_OTOMATIS + kolom `di_berkas_anda` (repo `pandeyoga/DAHOST`, di-bring-up ulang ke /app)
 **Konteks:** sesi sebelumnya terhenti tepat setelah menambah kolom `di_berkas_anda` di RINGKASAN_MODEL (`core/gap_fokus.py`); kode sudah ada di repo, belum diverifikasi & didokumentasikan.
 **Diverifikasi sesi ini (`tests/test_fokus_cakupan_bom.py` 16/16 PASS; testing agent iteration_224 backend 8/8 + frontend download PASS):**

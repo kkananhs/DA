@@ -56,12 +56,15 @@ bom_codes = {r[0] for r in rows(wb["BOM_AKSESORIS"])}
 check("SEMUA model kurang BOM di papan punya kelompok di BOM_AKSESORIS", flagged <= bom_codes, str(flagged - bom_codes))
 check("model dihentikan TIDAK di BOM_AKSESORIS", not (discontinued & bom_codes))
 by_code = {r[0]: r for r in ring}
-check("DA-2201 Ona: 'belum punya BOM sama sekali (7 varian)'", "belum punya BOM sama sekali (7" in (by_code.get("DA-2201") or [""] * 7)[6])
-check("DA-1509 Hanny: '2 dari 13 varian belum punya BOM'", "2 dari 13" in (by_code.get("DA-1509") or [""] * 7)[6])
-check("DA-2112 Heidi: 'belum punya varian/SKU'", "belum punya varian" in (by_code.get("DA-2112") or [""] * 7)[6])
-check("DA-2104 GIA: dihentikan (abu-abu)", "nonaktif" in (by_code.get("DA-2104") or [""] * 7)[6])
+check("DA-2201 Ona: 'belum punya BOM sama sekali (7 varian)'", "belum punya BOM sama sekali (7" in (by_code.get("DA-2201") or [""] * 8)[7])
+check("DA-1509 Hanny: '2 dari 13 varian belum punya BOM'", "2 dari 13" in (by_code.get("DA-1509") or [""] * 8)[7])
+check("DA-2112 Heidi: 'belum punya varian/SKU'", "belum punya varian" in (by_code.get("DA-2112") or [""] * 8)[7])
+check("DA-2104 GIA: dihentikan (abu-abu)", "nonaktif" in (by_code.get("DA-2104") or [""] * 8)[7])
 hanny = [r for r in rows(wb["BOM_AKSESORIS"]) if r[0] == "DA-1509"]
-check("Hanny: 2 kelompok per varian tanpa BOM dengan kolom varian terisi", len(hanny) == 2 and all(r[7] for r in hanny), str([r[7] for r in hanny]))
+check("Hanny: 1 kelompok untuk semua varian (tak satu pun BOM ber-aksesoris; 2 varian tanpa BOM dibuat saat unggah)", len(hanny) == 1 and not hanny[0][7] and "belum punya BOM dibuat otomatis" in (hanny[0][9] or ""), str(hanny))
+lyora = [r for r in rows(wb["BOM_AKSESORIS"]) if r[0] == "DA-1101"]
+check("Lyora: 1 dari 6 BOM tanpa aksesoris → 1 kelompok varian BURGUNDY disalin (biru) dari varian lain", len(lyora) == 1 and "BURGUNDY" in (lyora[0][7] or "") and lyora[0][2], str(lyora))
+check("papan: Lyora accessories ✗ (dinilai per varian)", "accessories" in next((r["missing"] for r in board["rows"] if r["code"] == "DA-1101"), []))
 vb_codes = {r[0] for r in rows(wb["VARIAN_BARU"])}
 check("model tanpa SKU ada di VARIAN_BARU DAN BOM_AKSESORIS", {"DA-2112", "DA-3512"} <= vb_codes & bom_codes)
 

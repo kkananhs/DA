@@ -13,15 +13,17 @@ def _key(d: dict) -> tuple:
 
 
 async def load_bom_state(db) -> dict:
-    """→ {model_id: {"boms": [bom aktif], "keys": set, "has_acc": bool}} untuk semua BOM aktif."""
+    """→ {model_id: {"boms": [bom aktif], "keys": set, "acc_keys": set, "has_acc": bool}} untuk semua BOM aktif.
+    acc_keys = kunci (size_id, warna) BOM yang PUNYA baris aksesoris — kelengkapan dinilai per BOM, bukan per model."""
     out: dict = {}
     async for b in db.rahaza_boms.find({"active": {"$ne": False}, "is_active": True},
                                        {"_id": 0, "id": 1, "model_id": 1, "size_id": 1, "color_code": 1, "materials": 1}):
-        st = out.setdefault(b["model_id"], {"boms": [], "keys": set(), "has_acc": False})
+        st = out.setdefault(b["model_id"], {"boms": [], "keys": set(), "acc_keys": set(), "has_acc": False})
         st["boms"].append(b)
         st["keys"].add(_key(b))
         if any(not _is_kept_line(ln) for ln in b.get("materials") or []):
             st["has_acc"] = True
+            st["acc_keys"].add(_key(b))
     return out
 
 
@@ -38,22 +40,26 @@ async def bom_gap_models(db) -> list[dict]:
     rows = []
     for m in models:
         vs = vmap.get(m["id"]) or []
-        st = state.get(m["id"]) or {"boms": [], "keys": set(), "has_acc": False}
+        st = state.get(m["id"]) or {"boms": [], "keys": set(), "acc_keys": set(), "has_acc": False}
         without = [v for v in vs if _key(v) not in st["keys"]]
+        without_acc = [v for v in vs if _key(v) in st["keys"] and _key(v) not in st["acc_keys"]]  # BOM ada, aksesoris kosong
         discontinued = not vs and all_counts.get(m["id"], 0) > 0
         row = {"code": m["code"], "name": m["name"], "category": m.get("category_name") or "", "model_id": m["id"],
-               "variants": vs, "variants_without_bom": without, "has_bom": bool(st["boms"]), "has_acc": st["has_acc"],
-               "discontinued": discontinued, "boms": st["boms"]}
+               "variants": vs, "variants_without_bom": without, "variants_without_acc": without_acc,
+               "has_bom": bool(st["boms"]), "has_acc": st["has_acc"], "discontinued": discontinued, "boms": st["boms"]}
         if discontinued:
             row["status"], row["sheet"] = "semua SKU nonaktif (sudah tidak dijual) — tidak perlu BOM", "— (aktifkan SKU dulu bila masih dijual)"
         elif not vs:
             row["status"], row["sheet"] = "belum punya varian/SKU sama sekali", "VARIAN_BARU (warna+ukuran) lalu BOM_AKSESORIS"
         elif not st["boms"]:
             row["status"], row["sheet"] = f"belum punya BOM sama sekali ({len(vs)} varian)", "BOM_AKSESORIS (aksesoris) + R&D → BOM (kain)"
-        elif without:
-            row["status"], row["sheet"] = f"{len(without)} dari {len(vs)} varian belum punya BOM", "BOM_AKSESORIS (baris biru disalin dari varian lain — periksa)"
-        elif not st["has_acc"]:
-            row["status"], row["sheet"] = "BOM ada, aksesoris belum diisi", "BOM_AKSESORIS"
+        elif not st["has_acc"]:  # tidak satu pun BOM punya aksesoris (varian tanpa BOM, bila ada, ikut dibuat saat kelompok diterapkan)
+            row["status"] = "BOM ada, aksesoris belum diisi" + (f" ({len(without)} dari {len(vs)} varian juga belum punya BOM)" if without else "")
+            row["sheet"] = "BOM_AKSESORIS"
+        elif without or without_acc:
+            parts = ([f"{len(without)} dari {len(vs)} varian belum punya BOM"] if without else []) + \
+                    ([f"{len(without_acc)} dari {len(vs)} varian BOM-nya belum punya aksesoris"] if without_acc else [])
+            row["status"], row["sheet"] = "; ".join(parts), "BOM_AKSESORIS (baris biru disalin dari varian lain — periksa)"
         else:
             continue
         rows.append(row)
