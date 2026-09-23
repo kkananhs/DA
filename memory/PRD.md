@@ -1,5 +1,16 @@
 # PRD — CV. Dewi Aditya ERP
 
+## SESI 2026-09-23 — Penutupan berkas FOKUS: sheet BOM_OTOMATIS + kolom `di_berkas_anda` (repo `pandeyoga/DAHOST`, di-bring-up ulang ke /app)
+**Konteks:** sesi sebelumnya terhenti tepat setelah menambah kolom `di_berkas_anda` di RINGKASAN_MODEL (`core/gap_fokus.py`); kode sudah ada di repo, belum diverifikasi & didokumentasikan.
+**Diverifikasi sesi ini (`tests/test_fokus_cakupan_bom.py` 16/16 PASS; testing agent iteration_224 backend 8/8 + frontend download PASS):**
+- **BOM_OTOMATIS** (sheet ke-5): kelompok BOM dari berkas klien yang TIDAK punya satu pun sel kuning (varian ditebak otomatis dari bahan pembeda → biru, atau model tanpa SKU yang selesai lewat VARIAN_BARU) dipisah dari BOM_AKSESORIS → klien hanya fokus ke BOM_AKSESORIS. Parser (`gap_sisa.BOM_SHEETS`) membaca kedua sheet → roundtrip `fill-preview` hasil FOKUS: ok=true, 0 error, 67 kelompok.
+- **RINGKASAN_MODEL kolom `di_berkas_anda`**: `—` tanpa berkas; dengan berkas: `N kelompok langsung diterapkan · N varian ditebak otomatis (BOM_OTOMATIS) · N masih perlu isian Anda (BOM_AKSESORIS)` (biru bila 0 perlu isian) atau `tidak ada di berkas Anda`; baris model dihentikan abu-abu.
+- Hasil dengan `DATA_YANG_PERLU_DIISI_DA (3).xlsx` klien: RINGKASAN 47 · VARIAN_BARU 38 · BOM_AKSESORIS 166 · BOM_OTOMATIS 292 · MATERIAL 88. Tanpa berkas: 47 · 20 · 129 · 0 · 87.
+- Berkas klien diperbarui: `frontend/public{,/downloads}/DATA_YANG_PERLU_DIISI_DA_FOKUS.xlsx` (+ `build/`) = versi tanpa berkas (kini ber-RINGKASAN_MODEL & BOM_OTOMATIS); `private/golive/DATA_YANG_PERLU_DIISI_DA_FOKUS_dari_DA3.xlsx` = sisa dari berkas klien DA (3). Berkas sumber klien: `private/golive/DATA_YANG_PERLU_DIISI_DA_3.xlsx` (gitignored).
+- Lingkungan: clone segar → `bootstrap.sh` gagal pip (konflik pin litellm) → `pip install -r <requirements tanpa emergentintegrations/litellm>`; restore seed go-live otomatis; frontend static bundle sudah memuat gap-fokus.
+**Sisa:** backlog rawat sesi #5 (FASE 0 di VPS, download-token FE, form `/api/capacity/config`, 21 koleksi hantu, T-25/T-27, T-09.3). Tidak ada bug terbuka pada berkas FOKUS.
+
+
 ## SESI 2026-09-22 #6 — Berkas FOKUS harus mencakup SEMUA model yang BOM-nya kurang (temuan owner vs papan Kelengkapan R&D)
 **Masalah:** `DATA_YANG_PERLU_DIISI_DA_FOKUS.xlsx` lama hanya memuat 21 model di BOM_AKSESORIS + 20 di VARIAN_BARU, sedangkan papan Kelengkapan Data R&D menandai 47 model ✗ BOM/aksesoris. Yang terlewat: model punya varian tapi NOL BOM (DA-2201 Ona 7 varian), varian tanpa BOM pada model yang sudah ber-BOM (Hanny/Hanni 2/13), model tanpa SKU tidak punya kelompok BOM (20), dan 6 model yang semua SKU-nya nonaktif (GIA, Luvia, Maudy, Erlyna, Airyn, Jeslyn) tampil ✗ padahal dihentikan.
 **Perbaikan (`tests/test_fokus_cakupan_bom.py` 16/16 PASS, DB dipulihkan):**
