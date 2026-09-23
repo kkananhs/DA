@@ -72,6 +72,7 @@ export default function RahazaMasterFillModule({ token }) {
     : downloadXlsx('/api/rahaza/master/gap-workbook', token, 'DATA_YANG_PERLU_DIISI_DA.xlsx')).catch((e) => toast.error(e.message));
   const dlLaporan = () => postXlsx('/api/rahaza/master/laporan-sisa', token, file, 'LAPORAN_SISA_DA.xlsx').catch((e) => toast.error(e.message));
   const dlFokus = () => postXlsx('/api/rahaza/master/gap-fokus', token, file, 'DATA_YANG_PERLU_DIISI_DA_FOKUS.xlsx').catch((e) => toast.error(e.message));
+  const dlHarga = () => downloadXlsx('/api/rahaza/master/harga-review', token, 'REVIEW_HARGA_MATERIAL_DA.xlsx').catch((e) => toast.error(e.message));
   const t = preview?.totals || {};
   const nApply = (t.materials || 0) + (t.accounts || 0) + (t.stores || 0) + (t.bom_lines || 0) + (t.models || 0) + (t.sku_prices || 0) + (t.sku_deactivate || 0) + (t.stock_rows || 0) + (t.salaries || 0);
   const bomWarn = preview?.warnings || [];
@@ -85,6 +86,7 @@ export default function RahazaMasterFillModule({ token }) {
         <GlassCard className="p-5 space-y-3"><div className="text-[10px] uppercase text-muted-foreground font-semibold">Langkah 1</div><h3 className="font-semibold text-sm">Unduh berkas isian</h3>
           <Button onClick={dlFokus} className="h-9 w-full" data-testid="fill-download-fokus"><Download className="w-3.5 h-3.5 mr-1.5" />{file ? 'Berkas FOKUS — sisa dari berkas ini' : 'Berkas FOKUS (yang perlu diisi saja)'}</Button>
           <p className="text-[11px] text-muted-foreground">Hanya yang masih perlu diisi: sheet VARIAN_BARU, BOM_AKSESORIS, MATERIAL. Semua baris sudah terisi — klien cukup mengisi sel <span className="rounded px-1 bg-[#FFF2CC] text-black">kuning</span>; sel <span className="rounded px-1 bg-[#DDEBF7] text-black">biru</span> = diisi otomatis (mis. varian dari nama bahan pembeda), cukup diperiksa. Kelompok yang seluruhnya sudah otomatis dipisah ke sheet BOM_OTOMATIS (ikut diterapkan saat diunggah balik). Kolom "yang_perlu_diisi" menyebut persis kekurangan tiap baris.</p>
+          <Button onClick={dlHarga} variant="outline" className="h-8 w-full text-xs" data-testid="fill-download-harga-review"><Download className="w-3.5 h-3.5 mr-1.5" />Review harga aksesoris & kain (HPP)</Button>
           <Button onClick={dlGap} variant="outline" className="h-8 w-full text-xs" data-testid="fill-download-gap"><Download className="w-3.5 h-3.5 mr-1.5" />{file ? 'Berkas lengkap — SISA dari berkas ini' : 'Berkas lengkap (semua sheet, 1 berkas)'}</Button>
           <Button onClick={dl} variant="outline" className="h-8 w-full text-xs" data-testid="fill-download"><Download className="w-3.5 h-3.5 mr-1.5" />Template lengkap (semua material)</Button></GlassCard>
         <GlassCard className="p-5 space-y-3"><div className="text-[10px] uppercase text-muted-foreground font-semibold">Langkah 2</div><h3 className="font-semibold text-sm">Unggah berkas terisi</h3>

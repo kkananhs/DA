@@ -74,6 +74,16 @@ async def gap_workbook_sisa(request: Request, file: UploadFile | None = File(Non
     return StreamingResponse(io.BytesIO(out), media_type=_XLSX, headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
+@router.get("/harga-review")
+async def harga_review(request: Request):
+    """REVIEW_HARGA_MATERIAL_DA.xlsx — semua aksesoris & kain: harga, satuan, isi kemasan, pemakaian di BOM, biaya per pcs & porsi HPP;
+    baris mencurigakan diwarnai. Sheet MATERIAL memakai kolom importir → bisa diunggah balik untuk memperbaiki harga."""
+    await _require_fin(request)
+    from core.harga_review import build_harga_review
+    data, _stats = await build_harga_review(get_db())
+    return StreamingResponse(io.BytesIO(data), media_type=_XLSX, headers={"Content-Disposition": 'attachment; filename="REVIEW_HARGA_MATERIAL_DA.xlsx"'})
+
+
 @router.post("/gap-fokus")
 async def gap_fokus(request: Request, file: UploadFile | None = File(None)):
     """DATA_YANG_PERLU_DIISI_DA_FOKUS.xlsx — hanya BOM_AKSESORIS · VARIAN_BARU · MATERIAL yang masih perlu diisi;
