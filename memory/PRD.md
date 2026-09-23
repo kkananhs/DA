@@ -1,5 +1,11 @@
 # PRD — CV. Dewi Aditya ERP
 
+## SESI 2026-09-23 #3 — REVIEW HARGA MATERIAL (owner: HPP membengkak karena salah input harga)
+- Baru: `core/harga_review.py` + `GET /api/rahaza/master/harga-review` → `REVIEW_HARGA_MATERIAL_DA.xlsx` (PETUNJUK · MATERIAL (kolom importir MAT_COLS + kolom bantu pemakaian/biaya per pcs/porsi HPP/tingkat/alasan) · HPP_MODEL · BOM_BARIS_MAHAL (200) · KAIN_PER_MODEL). Baris MERAH/KUNING diwarnai; berkas bisa diunggah balik apa adanya (0 perubahan) atau setelah harga_per_satuan_beli diisi → `fill-apply` scope=all. Tombol FE `fill-download-harga-review` (bundle di-rebuild). Testing agent iteration_225: 14/14 + FE PASS.
+- **Temuan nyata (515 material: 4 MERAH · 154 KUNING):** A-REN-0004 Renda Rajut Rp 328.900/m (→ HPP Ochi DA-4104 Rp 515.151, 98% aksesoris), A-KRT-0007 Karet Sepul Rp 33.000/m (Onella/Fella HPP 87–143k, 62–81% aksesoris), A-BIS-0001/0002 Bisban Rp 15.400/m (Lyora 64%). Pola: harga 1 ROLL ditulis sebagai harga per METER. 154 kuning = harga 0 atau isi kemasan roll/pack/gross belum diisi (benang dll).
+- Berkas: `private/golive/REVIEW_HARGA_MATERIAL_DA.xlsx`, publik `frontend/public/downloads/REVIEW_HARGA_MATERIAL_DA.xlsx`.
+
+
 ## SESI 2026-09-23 #2 — Laporan jujur kekosongan BOM + perbaikan logika "aksesoris per varian"
 **Temuan owner:** laporan sebelumnya salah. Verifikasi langsung dari DB (`scripts/laporan_kekosongan_bom.py`): 104 model aktif = 56 lengkap · 6 dihentikan · **42 harus diisi** (20 tanpa SKU · 1 nol BOM (Ona) · 2 Hanny/Hanni · 18 BOM tanpa aksesoris · **1 sebagian: DA-1101 Lyora BURGUNDY — terlewat semua laporan lama** karena `has_acc` dinilai per model).
 Simulasi (DB dipulihkan): unggah DA (3) apa adanya = 0 perubahan; terima semua tebakan biru → masih 40 kurang (13 di antaranya "sebagian varian" yang papan lama tandai ✓).
